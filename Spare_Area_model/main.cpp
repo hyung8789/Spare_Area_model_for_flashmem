@@ -18,6 +18,8 @@ void bitdisp(int c, int start_digits, int end_digits) {
 
 int SPARE_read(unsigned char* spare_area_pos, META_DATA*& dst_meta_buffer)
 {
+	/*** Spare Area의 전체 16byte에 대해 첫 1byte의 블록 및 섹터(페이지)의 상태 정보에 대한 처리 시작 ***/
+
 	unsigned char bits_8_buffer; //1byte == 8bit크기의 블록 및 섹터(페이지) 정보에 관하여 Spare Area를 읽어들인 버퍼 
 
 	//이하 삭제
@@ -128,6 +130,8 @@ int SPARE_read(unsigned char* spare_area_pos, META_DATA*& dst_meta_buffer)
 		printf("Sector State ERR\n");
 		goto WRONG_META_ERR;
 	}
+
+	/*** Spare Area의 전체 16byte에 대해 첫 1byte의 블록 및 섹터(페이지)의 상태 정보에 대한 처리 종료 ***/
 
 	// 기타 Meta 정보 추가 시 읽어서 처리 할 코드 추가
 
