@@ -19,8 +19,10 @@ void bitdisp(int c, int start_digits, int end_digits) {
 int SPARE_read(unsigned char* spare_area_pos, META_DATA*& dst_meta_buffer)
 {
 	unsigned char bits_8_buffer; //1byte == 8bit크기의 블록 및 섹터(페이지) 정보에 관하여 Spare Area를 읽어들인 버퍼 
-	unsigned block_state_buffer = SPARE_INIT_VALUE; //블록 상태 버퍼, 0x7(16) = 7(10) = 111(2)
-	unsigned sector_state_buffer = SPARE_INIT_VALUE; //섹터 상태 버퍼, 0x3(16) = 3(10) = 11(2)
+
+	//이하 삭제
+	//unsigned block_state_buffer = (0x7); //블록 상태 버퍼, 0x7(16) = 7(10) = 111(2)
+	//unsigned sector_state_buffer = (0x3); //섹터 상태 버퍼, 0x3(16) = 3(10) = 11(2)
 	//__int8 state_buffer_bit_digits; //블록 상태 버퍼, 섹터 상태 버퍼의 비트 자리 위치 카운터
 
 	//현재 Spare area의 1바이트만 사용하므로 해당 부분만 읽는다
@@ -33,8 +35,7 @@ int SPARE_read(unsigned char* spare_area_pos, META_DATA*& dst_meta_buffer)
 
 
 	/*** 읽어들인 8비트(2^7 ~2^0)에 대해서 블록 상태(2^7 ~ 2^5) 판별 ***/
-	block_state_buffer = (((bits_8_buffer) >> (5)) & (0x7)); //추출 끝나는 2^5 자리가 LSB에 오도록 오른쪽으로 5번 쉬프트하여, 00000111(2)와 AND 수행
-	/*
+	/* 삭제
 	state_buffer_bit_digits = 2; //블록 상태 버퍼의 2^2 자리 위치부터
 	for (__int8 bit_digits = 7; bit_digits >= 5; bit_digits--) //블록 상태 정보에 대하여
 	{
@@ -51,13 +52,12 @@ int SPARE_read(unsigned char* spare_area_pos, META_DATA*& dst_meta_buffer)
 
 		default:
 			printf("판별실패\n");
-			bitdisp(block_state_buffer, 3,0);
 			system("pause);
 			break;
 		}
 	}
 	*/
-	switch (block_state_buffer) //블록 상태 설정
+	switch ((((bits_8_buffer) >> (5)) & (0x7))) //추출 끝나는 2^5 자리가 LSB에 오도록 오른쪽으로 5번 쉬프트하여, 00000111(2)와 AND 수행
 	{
 	case (const unsigned)BLOCK_STATE::NORMAL_BLOCK_EMPTY:
 		dst_meta_buffer->block_state = BLOCK_STATE::NORMAL_BLOCK_EMPTY;
@@ -89,8 +89,7 @@ int SPARE_read(unsigned char* spare_area_pos, META_DATA*& dst_meta_buffer)
 	}
 		
 	/*** 읽어들인 8비트(2^7 ~2^0)에 대해서 섹터 상태(2^4 ~ 2^3) 판별 ***/
-	sector_state_buffer = (((bits_8_buffer) >> (3)) & (0x3)); //추출 끝나는 2^3 자리가 LSB에 오도록 오른쪽으로 3번 쉬프트하여, 00000011(2)와 AND 수행
-	/*
+	/* 삭제
 	state_buffer_bit_digits = 1; //섹터 상태 버퍼의 2^1 자리 위치부터
 	for (__int8 bit_digits = 4; bit_digits >= 3; bit_digits--) //섹터(페이지) 상태 정보에 대하여
 	{
@@ -107,12 +106,11 @@ int SPARE_read(unsigned char* spare_area_pos, META_DATA*& dst_meta_buffer)
 		
 		default:
 			printf("판별실패\n");
-			bitdisp(sector_state_buffer, 1,0);
 			system("pause);
 		}
 	}
 	*/
-	switch (sector_state_buffer) //섹터(페이지) 상태 설정
+	switch ((((bits_8_buffer) >> (3)) & (0x3))) //추출 끝나는 2^3 자리가 LSB에 오도록 오른쪽으로 3번 쉬프트하여, 00000011(2)와 AND 수행
 	{
 	case (const unsigned)SECTOR_STATE::EMPTY:
 		dst_meta_buffer->sector_state = SECTOR_STATE::EMPTY;
@@ -128,7 +126,6 @@ int SPARE_read(unsigned char* spare_area_pos, META_DATA*& dst_meta_buffer)
 
 	default:
 		printf("Sector State ERR\n");
-		bitdisp(sector_state_buffer, 1,0);
 		goto WRONG_META_ERR;
 	}
 
@@ -153,7 +150,8 @@ int SPARE_write(unsigned char* spare_area_pos, META_DATA*& src_meta_buffer)
 	if (src_meta_buffer == NULL)
 		return FAIL;
 
-	// Spare Area의 전체 16byte에 대해 첫 1byte를 블록 및 섹터(페이지)의 상태 정보에 대한 처리
+	/*** Spare Area의 전체 16byte에 대해 첫 1byte의 블록 및 섹터(페이지)의 상태 정보에 대한 처리 시작 ***/
+
 	// BLOCK_TYPE(Normal or Spare, 1bit) || IS_VALID (BLOCK, 1bit) || IS_EMPTY (BLOCK, 1bit) || IS_VALID (SECTOR, 1bit) || IS_EMPTY(SECTOR, 1bit) || DUMMY (3bit)
 	unsigned bits_8_buffer = ~(SPARE_INIT_VALUE); //1byte == 8bit크기의 블록 및 섹터(페이지) 정보에 관하여 Spare Area에 기록 할 버퍼, 00000000(2)
 
@@ -206,9 +204,10 @@ int SPARE_write(unsigned char* spare_area_pos, META_DATA*& src_meta_buffer)
 	// DUMMY 3비트 처리 (2^2 ~ 2^0)
 	bits_8_buffer |= (0x7); //00000111(2)를 OR 수행
 
-	// 기타 Meta 정보 추가 시 기록 할 코드 추가
-
 	spare_area_pos[SECTOR_PER_BYTE] = bits_8_buffer;
+	/*** Spare Area의 전체 16byte에 대해 첫 1byte의 블록 및 섹터(페이지)의 상태 정보에 대한 처리 종료 ***/
+
+	// 기타 Meta 정보 추가 시 기록 할 코드 추가
 
 	return SUCCESS;
 
