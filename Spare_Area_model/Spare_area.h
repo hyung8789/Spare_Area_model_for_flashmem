@@ -68,14 +68,36 @@ enum class SECTOR_STATE : const unsigned //섹터(페이지) 상태 정보
 	INVALID = (0x0) //0x0(16) = 0(10) = 00(2)
 };
 
-struct META_DATA
+class META_DATA
 {
+public:
+	META_DATA();
+	~META_DATA();
+	
 	BLOCK_STATE block_state; //블록 상태
 	SECTOR_STATE sector_state; //섹터 상태
+
+	int SPARE_read(unsigned char* spare_area_pos, META_DATA& dst_meta_data); //읽기
+	int SPARE_write(unsigned char* spare_area_pos, META_DATA& src_meta_data); //쓰기
+	void print_meta_info(META_DATA& src_meta_data); //출력
+	
+	//디버그용 이하 삭제
+	//META DATA 갱신 및 무효화는 META DATA 내부의 Spare Area 처리 함수에 의해서만 수행
+	void debug_validate_meta_data()
+	{
+		this->validate_meta_data();
+	}
+	void debug_invalidate_meta_data()
+	{
+		this->invalidate_meta_data();
+	}
+
+private:
+	void validate_meta_data(); //새로운 META DATA로 갱신 위해 유효 상태로 변경
+	void invalidate_meta_data(); //Spare Area에 기록 후 재사용 불가능 하도록 기존 META DATA 무효화
+
+	bool is_invalid; //현재 META_DATA의 무효화 상태 (true : 현재 Meta 정보 사용 가능, false : 현재 Meta 정보 사용 불가능 (Default))
 };
 
-int SPARE_read(unsigned char* spare_area_pos, META_DATA*& dst_meta_buffer);
-int SPARE_write(unsigned char* spare_area_pos, META_DATA*& src_meta_buffer);
-void print_meta_info(META_DATA*& src_data);
 
 void bitdisp(int c, int start_digits, int end_digits);
