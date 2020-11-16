@@ -41,7 +41,7 @@ enum class BLOCK_STATE : const unsigned //블록 상태 정보
 	* 블록에 대한 6가지 상태, 2^3 = 8, 3비트 필요
 	***/
 
-	NORMAL_BLOCK_EMPTY = (0x7), //초기 상태, 0x7(16) = 7(10) = 111(2)
+	NORMAL_BLOCK_EMPTY = (0x7), //초기 상태 (Default), 0x7(16) = 7(10) = 111(2)
 	NORMAL_BLOCK_VALID = (0x6), //0x6(16) = 6(10) = 110(2)
 	NORMAL_BLOCK_INVALID = (0x4), //0x4(16) = 4(10) = 100(2)
 	SPARE_BLOCK_EMPTY = (0x3), //0x3(16) = 3(10) = 011(2)
@@ -63,9 +63,16 @@ enum class SECTOR_STATE : const unsigned //섹터(페이지) 상태 정보
 	* 섹터에 대한 3가지 상태, 2^2 = 4, 2비트 필요
 	***/
 
-	EMPTY = (0x3), //초기 상태, 0x3(16) = 3(10) = 11(2)
+	EMPTY = (0x3), //초기 상태 (Default), 0x3(16) = 3(10) = 11(2)
 	VALID = (0x2), //0x2(16) = 2(10) = 10(2)
 	INVALID = (0x0) //0x0(16) = 0(10) = 00(2)
+};
+
+enum META_DATA_STATE //META_DATA의 상태 정보
+{ 
+	VALID, //현재 Meta 정보 쓰기 위해 사용 가능
+	INVALID, //현재 Meta 정보 쓰기 위해 사용 불가능 (Default)
+	READ_ONLY //읽기 전용 상태, 쓰기 불가능 (빈 페이지, 빈 블록 탐색 혹은 데이터 읽기 위한 Spare Area 판독 시 사용)
 };
 
 class META_DATA
@@ -77,10 +84,19 @@ public:
 	BLOCK_STATE block_state; //블록 상태
 	SECTOR_STATE sector_state; //섹터 상태
 
-	int SPARE_read(unsigned char* spare_area_pos, META_DATA& dst_meta_data); //읽기
-	int SPARE_write(unsigned char* spare_area_pos, META_DATA& src_meta_data); //쓰기
-	void print_meta_info(META_DATA& src_meta_data); //출력
-	
+	int SPARE_read(unsigned char* spare_area_pos); //읽기
+	int SPARE_write(unsigned char* spare_area_pos); //쓰기
+	void print_meta_info(); //출력
+	META_DATA_STATE& get_current_state(); //현재 META_DATA의 유효성 상태 정보 반환
+
+
+	//ftl write에서 모든 연산이 끝난 후 META_DATA에 대한 유효성 검사 수행
+	//만약, 유효한 상태일 경우 해당 Meta 정보에 대한 처리가 발생하지 않았으므로 오륜
+	//추가 예정 : read_only state로 변경위해
+
+
+
+
 	//디버그용 이하 삭제
 	//META DATA 갱신 및 무효화는 META DATA 내부의 Spare Area 처리 함수에 의해서만 수행
 	void debug_validate_meta_data()
@@ -91,13 +107,12 @@ public:
 	{
 		this->invalidate_meta_data();
 	}
-
+	
 private:
 	void validate_meta_data(); //새로운 META DATA로 갱신 위해 유효 상태로 변경
 	void invalidate_meta_data(); //Spare Area에 기록 후 재사용 불가능 하도록 기존 META DATA 무효화
 
-	bool is_invalid; //현재 META_DATA의 무효화 상태 (true : 현재 Meta 정보 사용 가능, false : 현재 Meta 정보 사용 불가능 (Default))
+	META_DATA_STATE this_state; //현재 META_DATA의 상태 정보
 };
-
 
 void bitdisp(int c, int start_digits, int end_digits);
