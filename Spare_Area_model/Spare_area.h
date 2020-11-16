@@ -87,13 +87,18 @@ public:
 	int SPARE_read(unsigned char* spare_area_pos); //읽기
 	int SPARE_write(unsigned char* spare_area_pos); //쓰기
 	void print_meta_info(); //출력
-	META_DATA_STATE& get_current_state(); //현재 META_DATA의 유효성 상태 정보 반환
+	META_DATA_STATE& get_current_state(); //현재 META_DATA의 상태 정보 반환
 
 
-	//ftl write에서 모든 연산이 끝난 후 META_DATA에 대한 유효성 검사 수행
-	//만약, 유효한 상태일 경우 해당 Meta 정보에 대한 처리가 발생하지 않았으므로 오륜
-	//추가 예정 : read_only state로 변경위해
+	/*
+	ftl write에서 모든 연산이 끝난 후 META_DATA에 대한 유효성 검사 수행
+	만약, 유효한 상태일 경우 해당 Meta 정보에 대한 처리가 발생하지 않았으므로 오류
+	
+	spare read 시 유효 상태로 변경=>spare write가 발생하지 않으므로 이미 유효상태=>오류발생=>read_only 상태 이용
+	read_only state로 어떻게 변경?
 
+	추가 예정 : read_only state로 변경위해
+	*/
 
 
 

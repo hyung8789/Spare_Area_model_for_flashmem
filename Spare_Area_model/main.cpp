@@ -271,7 +271,7 @@ void META_DATA::print_meta_info()
 	}
 }
 
-META_DATA_STATE& META_DATA::get_current_state() //현재 META_DATA의 유효성 상태 정보 반환
+META_DATA_STATE& META_DATA::get_current_state() //현재 META_DATA의 상태 정보 반환
 {
 	return this->this_state;
 }
