@@ -68,56 +68,46 @@ enum class SECTOR_STATE : const unsigned //섹터(페이지) 상태 정보
 	INVALID = (0x0) //0x0(16) = 0(10) = 00(2)
 };
 
-enum META_DATA_STATE //META_DATA의 상태 정보
-{ 
-	VALID, //현재 Meta 정보 쓰기 위해 사용 가능
-	INVALID, //현재 Meta 정보 쓰기 위해 사용 불가능 (Default)
-	READ_ONLY //읽기 전용 상태, 쓰기 불가능 (빈 페이지, 빈 블록 탐색 혹은 데이터 읽기 위한 Spare Area 판독 시 사용)
-};
-
-class META_DATA
+struct META_DATA
 {
-public:
-	META_DATA();
-	~META_DATA();
-	
 	BLOCK_STATE block_state; //블록 상태
 	SECTOR_STATE sector_state; //섹터 상태
-
-	int SPARE_read(unsigned char* spare_area_pos); //읽기
-	int SPARE_write(unsigned char* spare_area_pos); //쓰기
-	void print_meta_info(); //출력
-	META_DATA_STATE& get_current_state(); //현재 META_DATA의 상태 정보 반환
-
-
-	/*
-	ftl write에서 모든 연산이 끝난 후 META_DATA에 대한 유효성 검사 수행
-	만약, 유효한 상태일 경우 해당 Meta 정보에 대한 처리가 발생하지 않았으므로 오류
-	
-	spare read 시 유효 상태로 변경=>spare write가 발생하지 않으므로 이미 유효상태=>오류발생=>read_only 상태 이용
-	read_only state로 어떻게 변경?
-
-	추가 예정 : read_only state로 변경위해
-	*/
-
-
-
-	//디버그용 이하 삭제
-	//META DATA 갱신 및 무효화는 META DATA 내부의 Spare Area 처리 함수에 의해서만 수행
-	void debug_validate_meta_data()
-	{
-		this->validate_meta_data();
-	}
-	void debug_invalidate_meta_data()
-	{
-		this->invalidate_meta_data();
-	}
-	
-private:
-	void validate_meta_data(); //새로운 META DATA로 갱신 위해 유효 상태로 변경
-	void invalidate_meta_data(); //Spare Area에 기록 후 재사용 불가능 하도록 기존 META DATA 무효화
-
-	META_DATA_STATE this_state; //현재 META_DATA의 상태 정보
 };
 
+
+//Flash_read,write와 FTL_read,write간의 계층적인 처리를 위해 외부적으로 생성 및 접근한다.
+int SPARE_read(unsigned char* spare_area_pos, META_DATA*& dst_meta_buffer); //읽기
+int SPARE_write(unsigned char* spare_area_pos, META_DATA*& src_meta_buffer); //쓰기
+void print_meta_info(META_DATA*& src_meta_buffer); //출력
 void bitdisp(int c, int start_digits, int end_digits);
+
+int deallocate_single_meta_buffer(META_DATA*& src_meta_buffer)
+{
+	if (src_meta_buffer != NULL)
+	{
+		delete src_meta_buffer;
+		src_meta_buffer = NULL;
+
+		return SUCCESS;
+	}
+
+	return FAIL;
+}
+
+int deallocate_block_meta_buffer_array(META_DATA**& src_block_meta_buffer_array)
+{
+	if (src_block_meta_buffer_array != NULL)
+	{
+		for (__int8 offset_index = 0; offset_index < BLOCK_PER_SECTOR; offset_index++)
+		{
+			delete src_block_meta_buffer_array[offset_index];
+		}
+		delete[] src_block_meta_buffer_array;
+
+		src_block_meta_buffer_array = NULL;
+
+		return SUCCESS;
+	}
+
+	return FAIL;
+}
