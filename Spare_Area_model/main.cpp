@@ -17,12 +17,75 @@ void bitdisp(int c, int start_digits, int end_digits)
 	printf("\n");
 }
 
+META_DATA::META_DATA()
+{
+	this->block_state = BLOCK_STATE::NORMAL_BLOCK_EMPTY;
+	this->sector_state = SECTOR_STATE::EMPTY;
+	this->block_update_state = UPDATE_STATE::INIT;
+	this->sector_update_state = UPDATE_STATE::INIT;
+}
+
+META_DATA::~META_DATA()
+{
+}
+
+BLOCK_STATE META_DATA::get_block_state()
+{
+	return this->block_state;
+}
+
+SECTOR_STATE META_DATA::get_sector_state()
+{
+	return this->sector_state;
+}
+
+UPDATE_STATE META_DATA::get_block_update_state()
+{
+	return this->block_update_state;
+}
+UPDATE_STATE META_DATA::get_sector_update_state()
+{
+	return this->sector_update_state;
+}
+
+void META_DATA::set_block_state(BLOCK_STATE src_block_state)
+{
+	this->block_state = src_block_state;
+
+	switch (this->block_update_state)
+	{
+	case UPDATE_STATE::INIT: //초기 읽어들이기 전 상태일 시 OUT_DATED 상태로 변경
+		this->block_update_state = UPDATE_STATE::OUT_DATED;
+		break;
+
+	case UPDATE_STATE::OUT_DATED: //읽어들인 상태일 시 UPDATED 상태로 변경
+		this->block_update_state = UPDATE_STATE::UPDATED;
+		break;
+	}
+}
+
+void META_DATA::set_sector_state(SECTOR_STATE src_sector_state)
+{
+	this->sector_state = src_sector_state;
+
+	switch (this->sector_update_state)
+	{
+	case UPDATE_STATE::INIT: //초기 읽어들이기 전 상태일 시 OUT_DATED 상태로 변경
+		this->sector_update_state = UPDATE_STATE::OUT_DATED;
+		break;
+
+	case UPDATE_STATE::OUT_DATED: //읽어들인 상태일 시 UPDATED 상태로 변경
+		this->sector_update_state = UPDATE_STATE::UPDATED;
+		break;
+	}
+}
+
 int SPARE_read(unsigned char* spare_area_pos, META_DATA*& dst_meta_buffer)
 {
 	if (dst_meta_buffer != NULL)
 		goto MEM_LEAK_ERR;
 
-	dst_meta_buffer = new META_DATA;
+	dst_meta_buffer = new META_DATA();
 
 	/*** Spare Area의 전체 16byte에 대해 첫 1byte의 블록 및 섹터(페이지)의 상태 정보에 대한 처리 시작 ***/
 
@@ -62,27 +125,27 @@ int SPARE_read(unsigned char* spare_area_pos, META_DATA*& dst_meta_buffer)
 	switch ((((bits_8_buffer) >> (5)) & (0x7))) //추출 끝나는 2^5 자리가 LSB에 오도록 오른쪽으로 5번 쉬프트하여, 00000111(2)와 AND 수행
 	{
 	case (const unsigned)BLOCK_STATE::NORMAL_BLOCK_EMPTY:
-		dst_meta_buffer->block_state = BLOCK_STATE::NORMAL_BLOCK_EMPTY;
+		dst_meta_buffer->set_block_state(BLOCK_STATE::NORMAL_BLOCK_EMPTY);
 		break;
 
 	case (const unsigned)BLOCK_STATE::NORMAL_BLOCK_VALID:
-		dst_meta_buffer->block_state = BLOCK_STATE::NORMAL_BLOCK_VALID;
+		dst_meta_buffer->set_block_state(BLOCK_STATE::NORMAL_BLOCK_VALID);
 		break;
 
 	case (const unsigned)BLOCK_STATE::NORMAL_BLOCK_INVALID:
-		dst_meta_buffer->block_state = BLOCK_STATE::NORMAL_BLOCK_INVALID;
+		dst_meta_buffer->set_block_state(BLOCK_STATE::NORMAL_BLOCK_INVALID);
 		break;
 
 	case (const unsigned)BLOCK_STATE::SPARE_BLOCK_EMPTY:
-		dst_meta_buffer->block_state = BLOCK_STATE::SPARE_BLOCK_EMPTY;
+		dst_meta_buffer->set_block_state(BLOCK_STATE::SPARE_BLOCK_EMPTY);
 		break;
 
 	case (const unsigned)BLOCK_STATE::SPARE_BLOCK_VALID:
-		dst_meta_buffer->block_state = BLOCK_STATE::SPARE_BLOCK_VALID;
+		dst_meta_buffer->set_block_state(BLOCK_STATE::SPARE_BLOCK_VALID);
 		break;
 
 	case (const unsigned)BLOCK_STATE::SPARE_BLOCK_INVALID:
-		dst_meta_buffer->block_state = BLOCK_STATE::SPARE_BLOCK_INVALID;
+		dst_meta_buffer->set_block_state(BLOCK_STATE::SPARE_BLOCK_INVALID);
 		break;
 
 	default:
@@ -115,19 +178,30 @@ int SPARE_read(unsigned char* spare_area_pos, META_DATA*& dst_meta_buffer)
 	switch ((((bits_8_buffer) >> (3)) & (0x3))) //추출 끝나는 2^3 자리가 LSB에 오도록 오른쪽으로 3번 쉬프트하여, 00000011(2)와 AND 수행
 	{
 	case (const unsigned)SECTOR_STATE::EMPTY:
-		dst_meta_buffer->sector_state = SECTOR_STATE::EMPTY;
+		dst_meta_buffer->set_sector_state(SECTOR_STATE::EMPTY);
 		break;
 
 	case (const unsigned)SECTOR_STATE::VALID:
-		dst_meta_buffer->sector_state = SECTOR_STATE::VALID;
+		dst_meta_buffer->set_sector_state(SECTOR_STATE::VALID);
 		break;
 
 	case (const unsigned)SECTOR_STATE::INVALID:
-		dst_meta_buffer->sector_state = SECTOR_STATE::INVALID;
+		dst_meta_buffer->set_sector_state(SECTOR_STATE::INVALID);
 		break;
 
 	default:
 		printf("Sector State ERR\n");
+		goto WRONG_META_ERR;
+	}
+
+	/*** DUMMY 3비트 처리 (2^2 ~ 2^0) ***/
+	switch ((bits_8_buffer) &= (0x7)) //00000111(2)를 AND 수행
+	{
+	case (0x7): //111(2)가 아닐 경우 오류
+		break;
+
+	default:
+		printf("DUMMY bit Err\n");
 		goto WRONG_META_ERR;
 	}
 
@@ -159,7 +233,7 @@ int SPARE_write(unsigned char* spare_area_pos, META_DATA*& src_meta_buffer)
 	unsigned bits_8_buffer; //1byte == 8bit크기의 블록 및 섹터(페이지) 정보에 관하여 Spare Area에 기록 할 버퍼
 	bits_8_buffer = ~(SPARE_INIT_VALUE); //00000000(2)
 
-	switch (src_meta_buffer->block_state) //1바이트 크기의 bits_8_buffer에 대하여
+	switch (src_meta_buffer->get_block_state()) //1바이트 크기의 bits_8_buffer에 대하여
 	{
 	case BLOCK_STATE::NORMAL_BLOCK_EMPTY: //2^7, 2^6, 2^5 비트를 0x1으로 설정
 		bits_8_buffer |= (0x7 << 5); //111(2)를 5번 왼쪽 쉬프트하여 11100000(2)를 OR 수행
@@ -188,7 +262,7 @@ int SPARE_write(unsigned char* spare_area_pos, META_DATA*& src_meta_buffer)
 		goto WRONG_META_ERR;
 	}
 
-	switch (src_meta_buffer->sector_state) //1바이트 크기의 bits_8_buffer에 대하여
+	switch (src_meta_buffer->get_sector_state()) //1바이트 크기의 bits_8_buffer에 대하여
 	{
 	case SECTOR_STATE::EMPTY: //2^4, 2^3 비트를 0x1로 설정
 		bits_8_buffer |= (0x3 << 4); //11(2)를 3번 왼쪽 쉬프트하여 00011000(2)를 OR 수행
@@ -225,7 +299,7 @@ void print_meta_info(META_DATA*& src_meta_buffer)
 {
 	printf("Block State : ");
 
-	switch (src_meta_buffer->block_state)
+	switch (src_meta_buffer->get_block_state())
 	{
 	case BLOCK_STATE::NORMAL_BLOCK_EMPTY:
 		printf("NORMAL_BLOCK_EMPTY\n");
@@ -254,7 +328,7 @@ void print_meta_info(META_DATA*& src_meta_buffer)
 	}
 
 	printf("Sector State : ");
-	switch (src_meta_buffer->sector_state)
+	switch (src_meta_buffer->get_sector_state())
 	{
 	case SECTOR_STATE::EMPTY:
 		printf("EMPTY\n");
@@ -266,6 +340,38 @@ void print_meta_info(META_DATA*& src_meta_buffer)
 
 	case SECTOR_STATE::INVALID:
 		printf("INVALID\n");
+		break;
+	}
+
+	printf("Block Update State : ");
+	switch (src_meta_buffer->get_block_update_state())
+	{
+	case UPDATE_STATE::INIT:
+		printf("INIT\n");
+		break;
+
+	case UPDATE_STATE::OUT_DATED:
+		printf("OUT_DATED\n");
+		break;
+
+	case UPDATE_STATE::UPDATED:
+		printf("UPDATED\n");
+		break;
+	}
+
+	printf("Sector Update State : ");
+	switch (src_meta_buffer->get_sector_update_state())
+	{
+	case UPDATE_STATE::INIT:
+		printf("INIT\n");
+		break;
+
+	case UPDATE_STATE::OUT_DATED:
+		printf("OUT_DATED\n");
+		break;
+
+	case UPDATE_STATE::UPDATED:
+		printf("UPDATED\n");
 		break;
 	}
 }
@@ -308,8 +414,8 @@ void main()
 	printf("--change state 1--\n");
 	SPARE_read(sector, meta_data);
 	print_meta_info(meta_data);
-	meta_data->sector_state = SECTOR_STATE::VALID;
-	meta_data->block_state = BLOCK_STATE::SPARE_BLOCK_INVALID;
+	meta_data->set_sector_state(SECTOR_STATE::VALID);
+	meta_data->set_block_state(BLOCK_STATE::SPARE_BLOCK_INVALID);
 	printf("=>\n");
 	print_meta_info(meta_data);
 	printf("\nSpare_write 수행\n");
@@ -323,8 +429,8 @@ void main()
 	printf("\n--change state 2--\n");
 	SPARE_read(sector,meta_data);
 	print_meta_info(meta_data);
-	meta_data->sector_state = SECTOR_STATE::INVALID;
-	meta_data->block_state = BLOCK_STATE::NORMAL_BLOCK_INVALID;
+	meta_data->set_sector_state(SECTOR_STATE::INVALID);
+	meta_data->set_block_state(BLOCK_STATE::NORMAL_BLOCK_INVALID);
 	printf("=>\n");
 	print_meta_info(meta_data);
 	printf("\nSpare_write 수행\n");
